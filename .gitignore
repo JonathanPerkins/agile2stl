@@ -6,6 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
+# Data file
+agile_*.txt
+# Genrated file
+*.stl
+
 # Distribution / packaging
 .Python
 build/
