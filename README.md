@@ -3,7 +3,9 @@ Octopus Agile prices to 3D STL file
 
 This is a little project, inspired by Greg Jackson of Octopus Energy who challenged the community to produce a 3D printed visualisation of historical Octopus Agile electricity tariff prices.
 
-There are two Python 3 scripts here, one fetches teh required pricing data from the Octopus APIs and writes it to a CSV formatted file. The other script reads this CSV pricing file and builds a 3D model, writing the output in STL format ready for slicing for a 3D printer.
+There are two Python 3 scripts here, one fetches the required pricing data from the Octopus APIs and writes it to a CSV formatted file. The other script reads this CSV pricing file and builds a 3D model, writing the output in STL format ready for slicing for a 3D printer.
+
+For either script, the options '-h' or '--help' will show the command line options help.
 
 ## Fetching the Agile data
 
