@@ -7,15 +7,7 @@ from datetime import datetime
 import argparse
 import requests
 
-# URL parts - see https://developer.octopus.energy/docs/api/#agile-octopus
-
-BASE_URL = 'https://api.octopus.energy'
-PRODUCT_CODE = 'AGILE-18-02-21'
-MPAN_REGION = 'A'
-TARIFF_CODE = 'E-1R-' + PRODUCT_CODE + '-' + MPAN_REGION
-TARIFF_URL = BASE_URL + '/v1/products/' + PRODUCT_CODE + '/electricity-tariffs/' + TARIFF_CODE + '/standard-unit-rates'
-
-def get_months_data(year, month):
+def get_months_data(year, month, region):
     ''' Get the agile price data for the given year and month.
 
         Returns a dictionary with entries for each day,
@@ -26,6 +18,12 @@ def get_months_data(year, month):
     '''
     prices = {}
 
+    # URL parts - see https://developer.octopus.energy/docs/api/#agile-octopus
+    base_url = 'https://api.octopus.energy'
+    product_code = 'AGILE-18-02-21'
+    tariff_code = 'E-1R-' + product_code + '-' + region
+    tariff_url = base_url + '/v1/products/' + product_code + '/electricity-tariffs/' + tariff_code + '/standard-unit-rates'
+
     try:
         # Start and end range - collect the whole month
         start = "{0}-{1:02}-01T00:00Z".format(year, month)
@@ -34,7 +32,7 @@ def get_months_data(year, month):
         else:
             end = "{0}-{1:02}-01T00:00Z".format(year+1, 1)
 
-        req = requests.get(TARIFF_URL, params={'period_from': start, 'period_to': end, 'page_size': 1500})
+        req = requests.get(tariff_url, params={'period_from': start, 'period_to': end, 'page_size': 1500})
         req.raise_for_status()
 
         result_prices = req.json()['results']
@@ -71,11 +69,12 @@ def get_months_data(year, month):
 
     return prices
 
-def fetch_data(year, start_month, num_months, output_file):
+def fetch_data(year, start_month, num_months, region, output_file):
     ''' Fetch the agile prices for the given year '''
+    print("Fetching {0} months data from {1}/{2} for region {3}".format(num_months, year, start_month, region))
     year_data = []
     for month in range(start_month, (start_month + num_months)):
-        prices = get_months_data(year, month)
+        prices = get_months_data(year, month, region)
         if len(prices) > 0:
             for _, day_prices in prices.items():
                 year_data.append(day_prices)
@@ -111,7 +110,12 @@ PARSER.add_argument('-n', '--num-months', metavar='<num-months>',
                     dest="num_months", type=int, default=12,
                     help="the number of months data to fetch")
 
+PARSER.add_argument('-r', '--mpan-region', metavar='<region letter [A-M]>',
+                    dest="region", default='A',
+                    choices=['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P'],
+                    help="the electricity supply region (A to M) letter")
+
 # Run the parser, exiting on error
 ARGS = PARSER.parse_args()
 
-fetch_data(ARGS.year, ARGS.month, ARGS.num_months, ARGS.output_file[0])
+fetch_data(ARGS.year, ARGS.month, ARGS.num_months, ARGS.region, ARGS.output_file[0])

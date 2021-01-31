@@ -2,7 +2,6 @@
 
 ''' Script to convert an Agile data file into a 3D image '''
 
-import os
 import argparse
 import numpy as np
 import matplotlib.tri as mtri
@@ -10,6 +9,8 @@ from stl import mesh
 
 def do_conversion(infile, outfile):
     ''' Convert the image infile to a STL outfile '''
+    print("\nConverting Agile price data to STL\n")
+
     # Open data file and read into a numpy array
     in_data = np.loadtxt(infile, delimiter=",")
     in_width = len(in_data)
@@ -29,32 +30,37 @@ def do_conversion(infile, outfile):
     # and help complete the bottom box
     border_size = 10
 
+    # The height of the base
+    base_height = 5
+
+    # The maximum -ve offset supported (values below this will be clamped)
+    # Must be less than base_height! This is how far down into the base
+    # the lowest (clamped) value will go.
+    max_neg = -3
+
     # This is therefore the final size of our data array
     scaled_width = (in_width * scale_width) + (2 * border_size)
     scaled_depth = (in_depth * scale_depth) + (2 * border_size)
 
     # Create the scaled up integer array, including the border
-    scaled = np.zeros((scaled_width, scaled_depth), dtype='uint16')
-
-    # Load Convert to integer with offset for max supported -ve value
-    # The maximum -ve offset supported (values below this will be clamped)
-    max_neg = -10
+    # Note that we fill this with z values of base_height, as that is
+    # our zero cost plane and the top of the base box.
+    scaled = np.full((scaled_width, scaled_depth), base_height, dtype='uint16')
 
     for x in range(in_width):
         for y in range(in_depth):
-            # Scale the z component, adding max -ve offset
+            # Scale the z component, convert to integer, adding top of box offset
             if in_data[x][y] >= max_neg:
-                z = in_data[x][y] - max_neg
+                z = int(in_data[x][y] + base_height + 0.5)
             else:
-                z = (-max_neg)
+                z = base_height + max_neg
             # Store, scaling and applying the border offset
             for xx in range(scale_width):
                 for yy in range(scale_depth):
                     scaled[((scale_width * x) + border_size + xx), ((scale_depth * y) + border_size + yy)] = z
 
-    # To close the bottom of the image and create a box of height box_z, we need
+    # To close the bottom of the image and create a box of height base_height, we need
     # to add an extra 5 sides made up of 4 vertices and 10 triangles
-    box_z = 5
     num_box_extra_vertices = 4
     num_box_extra_triangles = 10
 
@@ -62,15 +68,14 @@ def do_conversion(infile, outfile):
     num_x = len(scaled[0])
     num_y = len(scaled)
     num_vertices = (num_x * num_y) + num_box_extra_vertices
-    print((num_x, num_y), num_vertices)
     vertices = np.zeros((num_vertices, 3), dtype=int)
     # Start by loading the extra 4 base vertices
     vertices[0:4] = [[0, 0, 0], [num_x-1, 0, 0], [0, num_y-1, 0], [num_x-1, num_y-1, 0]]
-    # Then the image
+    # Then the prepared data from above
     i = num_box_extra_vertices
     for y in range(num_y):
         for x in range(num_x):
-            vertices[i] = [x, y, (scaled[y][x] + box_z)]
+            vertices[i] = [x, y, scaled[y][x]]
             i = i + 1
 
     # Create an array of the triange vertices indexes
@@ -120,7 +125,7 @@ def do_conversion(infile, outfile):
 
     tris = mtri.Triangulation(vertices[:, 0], vertices[:, 1], triangles=triangles)
 
-    #=====STL=======
+    # Use the Mesh module to write the STL file
     data = np.zeros(len(tris.triangles), dtype=mesh.Mesh.dtype)
     image_mesh = mesh.Mesh(data, remove_empty_areas=False)
     image_mesh.x[:] = vertices[:, 1][tris.triangles]
@@ -133,24 +138,17 @@ def do_conversion(infile, outfile):
 # -------------------------------------------------------------------------
 
 # Create an options parser
-PARSER = argparse.ArgumentParser(description="Convert an image to 3D postcard",
+PARSER = argparse.ArgumentParser(description="Convert Octopus Agile historical price data to a 3D visualisation",
                                  fromfile_prefix_chars='@')
 
 PARSER.add_argument('input_file', nargs=1,
-                    help='the input image file')
+                    help='the input AGILE data file')
 
-PARSER.add_argument('-o', '--out', metavar='<output file>',
-                    dest="output_file",
-                    help="the output STL file")
-
-PARSER.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
+PARSER.add_argument('output_file', nargs=1,
+                    help='the output STL file')
 
 # Run the parser, exiting on error
 ARGS = PARSER.parse_args()
 
-# If output filename is not specified, build it from input file with .stl extension
-if not ARGS.output_file:
-    ARGS.output_file = os.path.splitext(ARGS.input_file[0])[0]+'.stl'
-
-# parsed OK, run the command
-do_conversion(ARGS.input_file[0], ARGS.output_file)
+# Parsed OK, run the command
+do_conversion(ARGS.input_file[0], ARGS.output_file[0])
