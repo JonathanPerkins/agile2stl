@@ -61,6 +61,7 @@ def get_months_data(year, month, region):
                     prices[day] = []
                 prices[day].append(str(price))
                 count = count + 1
+            print("- fetched {0}/{1}".format(year, month))
         else:
             print('Failed to get results for month {0}. Got {1} prices'.format(month, len(prices)))
 
@@ -69,17 +70,23 @@ def get_months_data(year, month, region):
 
     return prices
 
-def fetch_data(year, start_month, num_months, region, output_file):
+def fetch_data(start_year, start_month, num_months, region, output_file):
     ''' Fetch the agile prices for the given year '''
-    print("Fetching {0} months data from {1}/{2} for region {3}".format(num_months, year, start_month, region))
+    print("Fetching {0} months data from {1}/{2} for region {3}".format(num_months, start_year, start_month, region))
     year_data = []
-    for month in range(start_month, (start_month + num_months)):
-        prices = get_months_data(year, month, region)
+    # For modulo maths below to work, convert start_month to zero based
+    start_month = start_month - 1
+    # Let the month number exceed 12 in the loop, then
+    # normalise (year+month) when fetching months data
+    for month_num in range(start_month, (start_month + num_months)):
+        year = start_year + int(month_num / 12)
+        month = (month_num % 12)
+        prices = get_months_data(year, (month + 1), region)
         if len(prices) > 0:
             for _, day_prices in prices.items():
                 year_data.append(day_prices)
         else:
-            print("failed to get the years data")
+            print("Failed to get the years data")
             return
     # Write data to file
     with open(output_file, 'w') as file_handle:
@@ -103,7 +110,7 @@ PARSER.add_argument('-y', '--year', metavar='<year>',
                     help="the year from which to fetch data")
 
 PARSER.add_argument('-m', '--month', metavar='<month>',
-                    dest="month", type=int, default=1,
+                    dest="month", type=int, default=1, choices=range(1, 13),
                     help="the starting month from which to fetch")
 
 PARSER.add_argument('-n', '--num-months', metavar='<num-months>',
