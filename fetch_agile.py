@@ -4,10 +4,8 @@
 
 import calendar
 from datetime import datetime
+import argparse
 import requests
-
-# Year to fetch
-YEAR = 2020
 
 # URL parts - see https://developer.octopus.energy/docs/api/#agile-octopus
 
@@ -55,7 +53,7 @@ def get_months_data(year, month):
         # Finally, prices is a dict with array for each day of half hourly prices
 
         # Check we got the expected number of half hour prices
-        (_, days_in_month) = calendar.monthrange(YEAR, month)
+        (_, days_in_month) = calendar.monthrange(year, month)
         if len(price_data) == (48 * days_in_month):
             # Now build an array of prices for each day
             count = 0
@@ -73,10 +71,10 @@ def get_months_data(year, month):
 
     return prices
 
-def fetch_data(year):
+def fetch_data(year, start_month, num_months, output_file):
     ''' Fetch the agile prices for the given year '''
     year_data = []
-    for month in range(1, 13):
+    for month in range(start_month, (start_month + num_months)):
         prices = get_months_data(year, month)
         if len(prices) > 0:
             for _, day_prices in prices.items():
@@ -85,9 +83,35 @@ def fetch_data(year):
             print("failed to get the years data")
             return
     # Write data to file
-    with open('agile_{0}.txt'.format(year), 'w') as file_handle:
+    with open(output_file, 'w') as file_handle:
         for hh_array in year_data:
             day_costs = ','.join(hh_array)
             file_handle.write(day_costs+'\n')
 
-fetch_data(YEAR)
+# -------------------------------------------------------------------------
+# Main entry point
+# -------------------------------------------------------------------------
+
+# Create an options parser
+PARSER = argparse.ArgumentParser(description="Fetch Octopus agile historical price data",
+                                 fromfile_prefix_chars='@')
+
+PARSER.add_argument('output_file', nargs=1, type=str,
+                    help='the output file name')
+
+PARSER.add_argument('-y', '--year', metavar='<year>',
+                    dest="year", type=int, default=2020,
+                    help="the year from which to fetch data")
+
+PARSER.add_argument('-m', '--month', metavar='<month>',
+                    dest="month", type=int, default=1,
+                    help="the starting month from which to fetch")
+
+PARSER.add_argument('-n', '--num-months', metavar='<num-months>',
+                    dest="num_months", type=int, default=12,
+                    help="the number of months data to fetch")
+
+# Run the parser, exiting on error
+ARGS = PARSER.parse_args()
+
+fetch_data(ARGS.year, ARGS.month, ARGS.num_months, ARGS.output_file[0])
