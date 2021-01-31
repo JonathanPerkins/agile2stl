@@ -15,13 +15,30 @@ def do_conversion(infile, outfile):
     in_width = len(in_data)
     in_depth = len(in_data[0])
 
+    # At this point, data array width is 365/366 days and
+    # depth of 48 half hour slots per day.
+    # In order to be able to map to a 3d column, expand each
+    # data point to a 3x2 grid.
+    # This will also help to easily create the STL triangles
+    # later, without turning each data value into a sharp point.
+    scale_depth = 3
+    scale_width = 2
+
+    # And also add a border around the data, this improves the
+    # appearance and more importantly will also close off the edges
+    # and help complete the bottom box
+    border_size = 10
+
+    # This is therefore the final size of our data array
+    scaled_width = (in_width * scale_width) + (2 * border_size)
+    scaled_depth = (in_depth * scale_depth) + (2 * border_size)
+
+    # Create the scaled up integer array, including the border
+    scaled = np.zeros((scaled_width, scaled_depth), dtype='uint16')
+
+    # Load Convert to integer with offset for max supported -ve value
     # The maximum -ve offset supported (values below this will be clamped)
     max_neg = -10
-
-    # At this point, width is 365/366 and depth 48 half hour slots.
-    # Double the depth to make the picture easier to view.
-    # Convert to integer with offset for max supported -ve value
-    im = np.zeros((in_width, (in_depth * 2)), dtype='uint16')
 
     for x in range(in_width):
         for y in range(in_depth):
@@ -30,31 +47,20 @@ def do_conversion(infile, outfile):
                 z = in_data[x][y] - max_neg
             else:
                 z = (-max_neg)
-            # Store, doubling depth
-            im[x, (2 * y)] = z
-            im[x, ((2 * y) + 1)] = z
-
-    # Shape is (num rows, num columns)
-    # im is an array of rows, from the top of image downwards
-    im_height = len(im)
-    # each row is an array of pixel values from left to right
-    im_width = len(im[0])
-
-    # Add a zero border around the image, this will also close off the edges
-    # and complete the bottom box
-    border_width = 10
-    image = np.zeros(((2*border_width + im_height), (2*border_width + im_width)), dtype='uint16')
-    image[border_width:(border_width + im_height), border_width:(border_width + im_width)] = im
+            # Store, scaling and applying the border offset
+            for xx in range(scale_width):
+                for yy in range(scale_depth):
+                    scaled[((scale_width * x) + border_size + xx), ((scale_depth * y) + border_size + yy)] = z
 
     # To close the bottom of the image and create a box of height box_z, we need
-    # to add an extra 5 sides made up of an extra 4 vertices and 10 triangles
+    # to add an extra 5 sides made up of 4 vertices and 10 triangles
     box_z = 5
     num_box_extra_vertices = 4
     num_box_extra_triangles = 10
 
     # Create an array of the (x,y,z) values of all the vertices in the surface
-    num_x = len(image[0])
-    num_y = len(image)
+    num_x = len(scaled[0])
+    num_y = len(scaled)
     num_vertices = (num_x * num_y) + num_box_extra_vertices
     print((num_x, num_y), num_vertices)
     vertices = np.zeros((num_vertices, 3), dtype=int)
@@ -64,7 +70,7 @@ def do_conversion(infile, outfile):
     i = num_box_extra_vertices
     for y in range(num_y):
         for x in range(num_x):
-            vertices[i] = [x, y, (image[y][x] + box_z)]
+            vertices[i] = [x, y, (scaled[y][x] + box_z)]
             i = i + 1
 
     # Create an array of the triange vertices indexes
